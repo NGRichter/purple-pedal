@@ -28,9 +28,16 @@ LOG_MODULE_REGISTER(nvs_settings, CONFIG_APP_LOG_LEVEL);
 // 	SETTING_CURVE_SLOT(5),
 // };
 
+// Brake has a larger range
 static struct gamepad_calibration gp_calibration = {
-    .offset = {[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_OFFSET},
-    .scale = {[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_SCALE},
+    .offset = {
+        [0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_OFFSET,
+        [1] = LOAD_CELL_INDEX_1_OFFSET
+    },
+    .scale = {
+        [0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_SCALE,
+        [1] = LOAD_CELL_INDEX_1_SCALE
+    },
 };
 
 static struct gamepad_curve_context gp_curve_ctx = {
