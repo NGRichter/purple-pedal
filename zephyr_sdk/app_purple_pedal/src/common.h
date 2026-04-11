@@ -53,6 +53,15 @@ extern "C" {
 
 #define GAMEPAD_TOTAL_CURVE_SLOT_NUM (GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM+1) //use index 0 as default slot!
 
+#define MAX_SLOT_NAME_LEN 16
+
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_ID_BASE (0x30)
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT1_ID (0x31)
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT2_ID (0x32)
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT3_ID (0x33)
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT4_ID (0x34)
+#define GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT5_ID (0x35)
+
 enum app_state{
 	APP_STATE_IDLE=0,
 	APP_STATE_CONNECTED,
@@ -119,6 +128,11 @@ struct gamepad_curve_context{
 	uint8_t active_curve_slot;
 };
 
+struct gamepad_feature_rpt_slot_name {
+    uint8_t report_id;
+    char name[MAX_SLOT_NAME_LEN];
+} __packed;
+
 enum usb_event_type{
 	EVENT_HID = 0,
 	EVENT_USBD_MSG,
@@ -156,3 +170,6 @@ void post_usb_event(struct usb_event event);
 #ifdef __cplusplus
 }
 #endif
+
+int set_slot_name(uint8_t slot_id, const char *name);
+int get_slot_name(uint8_t slot_id, char *name);
