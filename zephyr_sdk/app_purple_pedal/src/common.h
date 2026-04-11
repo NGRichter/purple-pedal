@@ -25,6 +25,9 @@ extern "C" {
 
 #define LOAD_CELL_DISCONNECT_THRESHOLD (ADC_VAL_MAX * 99 / 100)
 
+#define LOAD_CELL_INDEX_1_OFFSET (8500000)
+#define LOAD_CELL_INDEX_1_SCALE (3500000)
+
 #define USB_DEVICE_CONTROLLER_ID DT_NODELABEL(zephyr_udc0)
 #define HID_DEVICE_ID DT_NODELABEL(hid_dev_0)
 
@@ -53,9 +56,22 @@ extern "C" {
 #define GAMEPAD_FEATURE_REPORT_CURVE_SLOT3_ID (0x13)
 #define GAMEPAD_FEATURE_REPORT_CURVE_SLOT4_ID (0x14)
 #define GAMEPAD_FEATURE_REPORT_CURVE_SLOT5_ID (0x15)
+// Reserve 5: We might define 5 more in the future
 #define GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM (5)
 
+// Calibration slots
+#define GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID (0x20)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE (0x20)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT1_ID (0x21)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT2_ID (0x22)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT3_ID (0x23)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT4_ID (0x24)
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT5_ID (0x25)
+// Reserve 5: We might define 5 more in the future
+#define GAMEPAD_FEATURE_REPORT_CALIB_SLOT_NUM (5)
+
 #define GAMEPAD_TOTAL_CURVE_SLOT_NUM (GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM+1) //use index 0 as default slot!
+#define GAMEPAD_TOTAL_CALIB_SLOT_NUM (GAMEPAD_FEATURE_REPORT_CALIB_SLOT_NUM+1) //use index 0 as default slot!
 
 enum app_state{
 	APP_STATE_IDLE=0,
@@ -123,6 +139,21 @@ struct gamepad_curve_context{
 	uint8_t active_curve_slot;
 };
 
+struct gamepad_feature_rpt_active_calib {
+    uint8_t report_id;
+    uint8_t active_calib_slot;
+} __packed;
+
+struct gamepad_feature_rpt_calib_slot {
+    uint8_t report_id;
+    struct gamepad_calibration calib;
+} __packed __aligned(2);
+
+struct gamepad_calib_context {
+    struct gamepad_calibration calib_slot[GAMEPAD_TOTAL_CALIB_SLOT_NUM];
+    uint8_t active_calib_slot;
+};
+
 enum usb_event_type{
 	EVENT_HID = 0,
 	EVENT_USBD_MSG,
@@ -153,6 +184,12 @@ int set_active_curve(uint8_t slot);
 const struct gamepad_curve* get_curve_slot(uint8_t slot_id);
 int set_curve_slot(uint8_t slot_id, const struct gamepad_curve *curve);
 const struct gamepad_curve* get_active_curve_slot(void);
+
+int set_active_calib(uint8_t slot);
+uint8_t get_active_calib(void);
+int set_calib_slot(uint8_t slot_id, const struct gamepad_calibration *calib);
+int get_calib_slot(uint8_t slot_id, struct gamepad_calibration *calib);
+struct gamepad_calibration* get_current_active_calib_ptr(void);
 
 //void gamepad_set_status_led(const enum app_state state);
 void post_usb_event(struct usb_event event);
