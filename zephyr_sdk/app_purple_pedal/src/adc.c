@@ -35,7 +35,6 @@ struct app_adc_ctx{
 	const struct adc_channel_cfg ch_cfgs[ADC_CHANNEL_COUNT];
 	const struct adc_sequence_options adc_seq_opt;
 	struct adc_sequence seq;
-	const struct gamepad_calibration *calibration;
 	int32_t channel_reading[CONFIG_SEQUENCE_SAMPLES][ADC_CHANNEL_COUNT];
 } ;
 
@@ -109,6 +108,9 @@ static struct app_adc_ctx ctx = {
 
 static inline uint16_t raw_to_uint16(int32_t raw, int32_t offset, int32_t scale)
 {
+	if (scale == 0) {
+		return 0;
+	}
 	//clamp the <offset values. also when loadcell is disconnect, we should output 0
 	if(raw < offset || raw >= LOAD_CELL_DISCONNECT_THRESHOLD) return 0;
 
@@ -116,24 +118,89 @@ static inline uint16_t raw_to_uint16(int32_t raw, int32_t offset, int32_t scale)
 	return (val_64 > UINT16_MAX)? UINT16_MAX : (uint16_t)val_64;
 }
 
-static uint16_t curve_calculate(uint16_t in, const uint16_t *curve_points, size_t num_points)
-{	//assume curve_points is sorted in ascending order, and in is also in ascending order
-	//find the segment that in is in, then do linear interpolation
+static uint16_t curve_calculate(uint16_t in, const uint16_t *curve_points, uint8_t num_points)
+{
+    if (num_points < 2) return in;
+    
+    // Clamp max value instantly to prevent overflow
+    if (in >= 65535) {
+        return curve_points[num_points - 1];
+    }
 
-	size_t idx = in * (num_points-1) / (UINT16_MAX);
-	//now in is between curve_points[idx] and curve_points[idx+1]
+    uint8_t shift;
+    uint16_t mask;
 
-	size_t in0 = idx * (UINT16_MAX) / (num_points-1);
-	//size_t in1 = (idx+1) * (UINT16_MAX) / (num_points-1);
+    // Fast-path for optimized Power-of-2 + 1 resolutions
+    switch (num_points) {
+        case 65: // 64 intervals -> Width 1024
+            shift = 10;
+            mask = 0x03FF;
+            break;
+        case 33: // 32 intervals -> Width 2048
+            shift = 11;
+            mask = 0x07FF;
+            break;
+        case 17: // 16 intervals -> Width 4096
+            shift = 12;
+            mask = 0x0FFF;
+            break;
+        case 9:  // 8 intervals -> Width 8192
+            shift = 13;
+            mask = 0x1FFF;
+            break;
+        case 5:  // 4 intervals -> Width 16384
+            shift = 14;
+            mask = 0x3FFF;
+            break;
+            
+        // Slow-path fallback for custom/irregular array sizes
+        default: {
+            uint32_t intervals = num_points - 1;
+            uint32_t interval_width = 65536 / intervals; 
+            
+            uint32_t idx = in / interval_width;
+            if (idx >= intervals) {
+                idx = intervals - 1;
+            }
+            
+            uint32_t x = in % interval_width;
+            int32_t y0 = (int32_t)curve_points[idx];
+            int32_t y1 = (int32_t)curve_points[idx + 1];
+            
+            int32_t interpolated = y0 + (((y1 - y0) * (int32_t)x) / (int32_t)interval_width);
+            
+            if (interpolated < 0) return 0;
+            if (interpolated > 65535) return 65535;
+            return (uint16_t)interpolated;
+        }
+    }
 
-    uint32_t x = in - in0;
-    uint32_t y0 = curve_points[idx];
-    uint32_t y1 = curve_points[idx + 1];
+    // --- Execution for Fast-Path (Bitwise Math) ---
+    
+    // Bit-shift determines array index
+    uint32_t idx = in >> shift; 
+    
+    // Safety clamp (Hardware guarantees this won't hit if 'in' < 65535, but safe for embedded)
+    if (idx >= (num_points - 1)) {
+        idx = num_points - 2;
+    }
 
-    uint32_t out = y0 + x * (y1 - y0) * (num_points - 1) / UINT16_MAX;
+    // Bit-mask determines interpolation progress
+    uint32_t x = in & mask;
 
-    return (uint16_t)out;
+    int32_t y0 = (int32_t)curve_points[idx];
+    int32_t y1 = (int32_t)curve_points[idx + 1];
 
+    int32_t delta = y1 - y0;
+
+    // Bit-shift handles the final division
+    int32_t interpolated = y0 + ((delta * (int32_t)x) >> shift);
+
+    // Hard clamp to prevent uint16_t wrap-around loops
+    if (interpolated < 0) return 0;
+    if (interpolated > 65535) return 65535;
+
+    return (uint16_t)interpolated;
 }
 
 static void app_adc_work_handler(struct k_work *work)
@@ -193,15 +260,17 @@ static void app_adc_work_handler(struct k_work *work)
 	// 				ctx->calibration->scale[SETTING_INDEX_CLUTCH]),
 	// };
 
+	const struct gamepad_calibration *active_calib = get_current_active_calib_ptr();
+
 	uint16_t acc_tmp = 	raw_to_uint16(rpt_raw_val.accelerator_raw, 
-					ctx->calibration->offset[SETTING_INDEX_ACCELERATOR], 
-					ctx->calibration->scale[SETTING_INDEX_ACCELERATOR]);
+					active_calib->offset[SETTING_INDEX_ACCELERATOR], 
+					active_calib->scale[SETTING_INDEX_ACCELERATOR]);
 	uint16_t brake_tmp = 	raw_to_uint16(rpt_raw_val.brake_raw, 
-					ctx->calibration->offset[SETTING_INDEX_BRAKE], 
-					ctx->calibration->scale[SETTING_INDEX_BRAKE]);
+					active_calib->offset[SETTING_INDEX_BRAKE], 
+					active_calib->scale[SETTING_INDEX_BRAKE]);
 	uint16_t clutch_tmp = 	raw_to_uint16(rpt_raw_val.clutch_raw, 
-					ctx->calibration->offset[SETTING_INDEX_CLUTCH], 
-					ctx->calibration->scale[SETTING_INDEX_CLUTCH]);
+					active_calib->offset[SETTING_INDEX_CLUTCH], 
+					active_calib->scale[SETTING_INDEX_CLUTCH]);
 
 	//TODO: apply curve here
 	const struct gamepad_curve* curve = get_active_curve_slot();
@@ -326,7 +395,5 @@ int app_adc_init(void)
 	k_work_queue_init(&app_adc_workq);
 	k_work_queue_start(&app_adc_workq, app_adc_workq_stack_area,K_THREAD_STACK_SIZEOF(app_adc_workq_stack_area), APP_ADC_PRIORITY,NULL);
 
-	//get the pointer to calibration settings
-	ctx.calibration = get_calibration();
 	return 0;
 }

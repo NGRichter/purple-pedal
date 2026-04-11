@@ -177,7 +177,55 @@ LOG_MODULE_REGISTER(usb, CONFIG_APP_LOG_LEVEL);
 			HID_REPORT_SIZE(8), \
 			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
 			HID_FEATURE(0x02), \
-	HID_END_COLLECTION,			\
+			/* Active Calibration Report */ \
+    		HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(1), \
+    		HID_FEATURE(0x02), \
+			/* Calibration slot 1*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT1_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+    		HID_FEATURE(0x02), \
+			/* Calibration slot 2*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT2_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+    		HID_FEATURE(0x02), \
+			/* Calibration slot 3*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT3_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+    		HID_FEATURE(0x02), \
+			/* Calibration slot 4*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT4_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+    		HID_FEATURE(0x02), \
+			/* Calibration slot 5*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT5_ID), \
+			HID_USAGE(0x25), \
+    		HID_LOGICAL_MIN8(0x00), \
+    		HID_LOGICAL_MAX16(0xff, 0x00), \
+    		HID_REPORT_SIZE(8), \
+    		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+    		HID_FEATURE(0x02), \
+			HID_END_COLLECTION,			\
 }
 //TODO: add usage page LED and LED outputs. see HUT doc section 11 LED Page.
 
@@ -292,7 +340,8 @@ static int gamepad_get_report(const struct device *dev,const uint8_t type, const
 		return sizeof(struct gamepad_feature_rpt_active_curve);
 	}
 
-	if(id >= GAMEPAD_FEATURE_REPORT_CURVE_SLOT1_ID && id <= GAMEPAD_FEATURE_REPORT_CURVE_SLOT5_ID){
+	if (id >= GAMEPAD_FEATURE_REPORT_CURVE_SLOT1_ID && 
+		id < GAMEPAD_FEATURE_REPORT_CURVE_SLOT_ID_BASE + GAMEPAD_TOTAL_CURVE_SLOT_NUM){
 		if(len < sizeof(struct gamepad_feature_rpt_curve)){
 			LOG_ERR("len %d <  sizeof(struct gamepad_feature_rpt_curve) %d", 
 				len, sizeof(struct gamepad_feature_rpt_curve));
@@ -312,6 +361,21 @@ static int gamepad_get_report(const struct device *dev,const uint8_t type, const
 		get_slot_name(id, rpt->name);
 		return sizeof(struct gamepad_feature_rpt_slot_name);
 	}
+	if (id == GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID) {
+        struct gamepad_feature_rpt_active_calib *rpt = (struct gamepad_feature_rpt_active_calib *)buf;
+        rpt->report_id = id;
+        rpt->active_calib_slot = get_active_calib();
+        return sizeof(struct gamepad_feature_rpt_active_calib);
+    }
+
+    if (id >= GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE && 
+        id < GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE + GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        
+        struct gamepad_feature_rpt_calib_slot *rpt = (struct gamepad_feature_rpt_calib_slot *)buf;
+        rpt->report_id = id;
+        get_calib_slot(id, &rpt->calib);
+        return sizeof(struct gamepad_feature_rpt_calib_slot);
+    }
 
 	LOG_WRN("Get Report not implemented, Type %u ID %u", type, id);
 	return 0;
@@ -358,7 +422,7 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 		return 0;
 	}
 
-	if(id == GAMEPAD_FEATURE_REPORT_ACTIVE_CURVE_ID){
+	if (id == GAMEPAD_FEATURE_REPORT_ACTIVE_CURVE_ID) {
 		if (len != sizeof(struct gamepad_feature_rpt_active_curve)){
 			LOG_ERR("len %d does not equal to  sizeof(struct gamepad_feature_rpt_active_curve) %d",
 					len, sizeof(struct gamepad_feature_rpt_active_curve));
@@ -366,13 +430,14 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 		}
 		struct gamepad_feature_rpt_active_curve *rpt = (struct gamepad_feature_rpt_active_curve *)buf;
 		int err = set_active_curve(rpt->active_curve_slot);
-		if(err){
+		if (err) {
 			LOG_ERR("set_active_curve() returns %d", err);
 		}
 		return 0;
 	}
 
-	if(id >= GAMEPAD_FEATURE_REPORT_CURVE_SLOT1_ID && id <= GAMEPAD_FEATURE_REPORT_CURVE_SLOT5_ID){
+	if (id >= GAMEPAD_FEATURE_REPORT_CURVE_SLOT1_ID && 
+		id < GAMEPAD_FEATURE_REPORT_CURVE_SLOT_ID_BASE + GAMEPAD_TOTAL_CURVE_SLOT_NUM) {
 		if(len < sizeof(struct gamepad_feature_rpt_curve)){
 			LOG_ERR("len %d <  sizeof(struct gamepad_feature_rpt_curve) %d", 
 				len, sizeof(struct gamepad_feature_rpt_curve));
@@ -380,7 +445,7 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 		}
 		struct gamepad_feature_rpt_curve *rpt = (struct gamepad_feature_rpt_curve*)buf;
 		int err = set_curve_slot(id, &rpt->curve);
-		if(err){
+		if (err) {
 			LOG_ERR("set_curve_slot() returns %d", err);
 		}
 		return 0;
@@ -400,6 +465,25 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 		}
 		return 0;
 	}
+	if (id == GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID) {
+        struct gamepad_feature_rpt_active_calib *rpt = (struct gamepad_feature_rpt_active_calib *)buf;
+        int err = set_active_calib(rpt->active_calib_slot);
+        if (err) {
+			LOG_ERR("set_active_calib() returns %d", err);
+		}
+		return 0;
+    }
+
+    if (id >= GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE && 
+        id < GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE + GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        
+        struct gamepad_feature_rpt_calib_slot *rpt = (struct gamepad_feature_rpt_calib_slot *)buf;
+        int err = set_calib_slot(id, &rpt->calib);
+        if (err) {
+			LOG_ERR("set_calib_slot() returns %d", err);
+		}
+		return 0;
+    }
 
 	LOG_WRN("Set Report not implemented, Type %u ID %u", type, id);
 	return 0;
