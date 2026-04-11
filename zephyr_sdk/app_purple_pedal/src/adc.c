@@ -35,7 +35,6 @@ struct app_adc_ctx{
 	const struct adc_channel_cfg ch_cfgs[ADC_CHANNEL_COUNT];
 	const struct adc_sequence_options adc_seq_opt;
 	struct adc_sequence seq;
-	const struct gamepad_calibration *calibration;
 	int32_t channel_reading[CONFIG_SEQUENCE_SAMPLES][ADC_CHANNEL_COUNT];
 } ;
 
@@ -109,6 +108,9 @@ static struct app_adc_ctx ctx = {
 
 static inline uint16_t raw_to_uint16(int32_t raw, int32_t offset, int32_t scale)
 {
+	if (scale == 0) {
+		return 0;
+	}
 	//clamp the <offset values. also when loadcell is disconnect, we should output 0
 	if(raw < offset || raw >= LOAD_CELL_DISCONNECT_THRESHOLD) return 0;
 
@@ -119,6 +121,9 @@ static inline uint16_t raw_to_uint16(int32_t raw, int32_t offset, int32_t scale)
 static uint16_t curve_calculate(uint16_t in, const uint16_t *curve_points, size_t num_points)
 {	//assume curve_points is sorted in ascending order, and in is also in ascending order
 	//find the segment that in is in, then do linear interpolation
+	if (num_points <= 1) {
+		return 0;
+	}
 
 	size_t idx = in * (num_points-1) / (UINT16_MAX);
 	//now in is between curve_points[idx] and curve_points[idx+1]
@@ -193,15 +198,17 @@ static void app_adc_work_handler(struct k_work *work)
 	// 				ctx->calibration->scale[SETTING_INDEX_CLUTCH]),
 	// };
 
+	const struct gamepad_calibration *active_calib = get_current_active_calib_ptr();
+
 	uint16_t acc_tmp = 	raw_to_uint16(rpt_raw_val.accelerator_raw, 
-					ctx->calibration->offset[SETTING_INDEX_ACCELERATOR], 
-					ctx->calibration->scale[SETTING_INDEX_ACCELERATOR]);
+					active_calib->offset[SETTING_INDEX_ACCELERATOR], 
+					active_calib->scale[SETTING_INDEX_ACCELERATOR]);
 	uint16_t brake_tmp = 	raw_to_uint16(rpt_raw_val.brake_raw, 
-					ctx->calibration->offset[SETTING_INDEX_BRAKE], 
-					ctx->calibration->scale[SETTING_INDEX_BRAKE]);
+					active_calib->offset[SETTING_INDEX_BRAKE], 
+					active_calib->scale[SETTING_INDEX_BRAKE]);
 	uint16_t clutch_tmp = 	raw_to_uint16(rpt_raw_val.clutch_raw, 
-					ctx->calibration->offset[SETTING_INDEX_CLUTCH], 
-					ctx->calibration->scale[SETTING_INDEX_CLUTCH]);
+					active_calib->offset[SETTING_INDEX_CLUTCH], 
+					active_calib->scale[SETTING_INDEX_CLUTCH]);
 
 	//TODO: apply curve here
 	const struct gamepad_curve* curve = get_active_curve_slot();
@@ -326,7 +333,5 @@ int app_adc_init(void)
 	k_work_queue_init(&app_adc_workq);
 	k_work_queue_start(&app_adc_workq, app_adc_workq_stack_area,K_THREAD_STACK_SIZEOF(app_adc_workq_stack_area), APP_ADC_PRIORITY,NULL);
 
-	//get the pointer to calibration settings
-	ctx.calibration = get_calibration();
 	return 0;
 }
