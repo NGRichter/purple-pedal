@@ -25,6 +25,11 @@ LOG_MODULE_REGISTER(nvs_settings, CONFIG_APP_LOG_LEVEL);
 #define SETTING_CALIBRATION_LEN (sizeof(struct gamepad_calibration))
 #define SETTING_CURVE_ACTIVE_LEN (SIZEOF_FIELD(struct gamepad_feature_rpt_active_curve, active_curve_slot))
 
+#define SETTING_SUB_SLOT_NAME "name"
+#define SETTING_SLOT_NAME SETTING_GAMEPAD_ROOT"/"SETTING_SUB_SLOT_NAME
+
+static char gp_slot_names[GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM][MAX_SLOT_NAME_LEN];
+
 // static const char *SETTING_CURVE_SLOT_STRS[GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM] = {
 // 	//Note: slot0 is the defaut slot that only lives in RAM
 // 	SETTING_CURVE_SLOT(1),
@@ -119,6 +124,22 @@ int gampepad_setting_handle_set(const char *name, size_t len, settings_read_cb r
 		return rc;
 	}
 
+	if (settings_name_steq(name, SETTING_SUB_SLOT_NAME, &next) && next) {
+		if (*next < '1' || *next > ('0' + GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM)) {
+			return -EINVAL;
+		}
+		uint8_t slot = *next - '0';
+		
+		size_t copy_len = len < MAX_SLOT_NAME_LEN ? len : (MAX_SLOT_NAME_LEN - 1);
+		memset(gp_slot_names[slot - 1], 0, MAX_SLOT_NAME_LEN);
+		
+		int rc = read_cb(cb_arg, gp_slot_names[slot - 1], copy_len);
+		if (rc >= 0) {
+			return 0;
+		}
+		return rc;
+	}
+
     return -ENOENT;
 }
 
@@ -136,6 +157,9 @@ int app_setting_init(void)
 		}
 	}
 
+	for (size_t i = 0; i < GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM; i++) {
+        snprintf(gp_slot_names[i], MAX_SLOT_NAME_LEN, "Preset %d", i + 1);
+    }
 	gp_calib_ctx.active_calib_slot = 1;
 	for (size_t slot = 0; slot < GAMEPAD_TOTAL_CALIB_SLOT_NUM; slot++) {
 		gp_calib_ctx.calib_slot[slot] = (struct gamepad_calibration) {
@@ -220,6 +244,39 @@ const struct gamepad_curve* get_active_curve_slot(void)
 	return get_curve_slot(gp_curve_ctx.active_curve_slot + GAMEPAD_FEATURE_REPORT_CURVE_SLOT_ID_BASE);
 }
 
+int set_slot_name(uint8_t slot_id, const char *name)
+{
+    uint8_t slot = slot_id - GAMEPAD_FEATURE_REPORT_SLOT_NAME_ID_BASE;
+    if (slot == 0 || slot > GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM) {
+        return -EINVAL;
+    }
+
+    char setting_name[sizeof(SETTING_SLOT_NAME) + 3]; 
+    snprintf(setting_name, sizeof(setting_name), SETTING_SLOT_NAME"/%d", slot);
+    
+    // Create a zero-initialized buffer and strictly truncate to 15 chars to guarantee null-termination
+    char safe_name[MAX_SLOT_NAME_LEN] = {0};
+    memcpy(safe_name, name, MAX_SLOT_NAME_LEN - 1);
+
+    // Only save the actual string length to flash memory to optimize Zepyhr NVS wear
+    int err = settings_save_one(setting_name, safe_name, strlen(safe_name));
+    if (err) return err;
+
+    // Update the high-speed RAM cache
+    memcpy(gp_slot_names[slot - 1], safe_name, MAX_SLOT_NAME_LEN);
+    return 0;
+}
+
+int get_slot_name(uint8_t slot_id, char *name)
+{
+    uint8_t slot = slot_id - GAMEPAD_FEATURE_REPORT_SLOT_NAME_ID_BASE;
+    if (slot == 0 || slot > GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM) {
+        return -EINVAL;
+    }
+    
+    memcpy(name, gp_slot_names[slot - 1], MAX_SLOT_NAME_LEN);
+    return 0;
+}
 int set_active_calib(uint8_t slot)
 {
     if (slot == 0 || slot > GAMEPAD_TOTAL_CALIB_SLOT_NUM) {

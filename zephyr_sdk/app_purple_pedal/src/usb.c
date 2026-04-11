@@ -137,6 +137,46 @@ LOG_MODULE_REGISTER(usb, CONFIG_APP_LOG_LEVEL);
 			HID_REPORT_SIZE(8),	\
 			HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
 			HID_FEATURE(0x02), \
+			/* Preset Name Slot 1*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT1_ID), \
+			HID_USAGE(0x25), \
+			HID_LOGICAL_MIN8(0x00), \
+			HID_LOGICAL_MAX16(0xff, 0x00), \
+			HID_REPORT_SIZE(8), \
+			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
+			HID_FEATURE(0x02), \
+			/* Preset Name Slot 2*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT2_ID), \
+			HID_USAGE(0x25), \
+			HID_LOGICAL_MIN8(0x00), \
+			HID_LOGICAL_MAX16(0xff, 0x00), \
+			HID_REPORT_SIZE(8), \
+			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
+			HID_FEATURE(0x02), \
+			/* Preset Name Slot 3*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT3_ID), \
+			HID_USAGE(0x25), \
+			HID_LOGICAL_MIN8(0x00), \
+			HID_LOGICAL_MAX16(0xff, 0x00), \
+			HID_REPORT_SIZE(8), \
+			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
+			HID_FEATURE(0x02), \
+			/* Preset Name Slot 4*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT4_ID), \
+			HID_USAGE(0x25), \
+			HID_LOGICAL_MIN8(0x00), \
+			HID_LOGICAL_MAX16(0xff, 0x00), \
+			HID_REPORT_SIZE(8), \
+			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
+			HID_FEATURE(0x02), \
+			/* Preset Name Slot 5*/ \
+			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT5_ID), \
+			HID_USAGE(0x25), \
+			HID_LOGICAL_MIN8(0x00), \
+			HID_LOGICAL_MAX16(0xff, 0x00), \
+			HID_REPORT_SIZE(8), \
+			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
+			HID_FEATURE(0x02), \
 			/* Active Calibration Report */ \
     		HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID), \
 			HID_USAGE(0x25), \
@@ -313,6 +353,14 @@ static int gamepad_get_report(const struct device *dev,const uint8_t type, const
 		return sizeof(struct gamepad_feature_rpt_curve);
 	}
 
+	if (id >= GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT1_ID && 
+		id < GAMEPAD_FEATURE_REPORT_SLOT_NAME_ID_BASE + GAMEPAD_TOTAL_CURVE_SLOT_NUM) {
+		
+		struct gamepad_feature_rpt_slot_name *rpt = (struct gamepad_feature_rpt_slot_name *)buf;
+		rpt->report_id = id;
+		get_slot_name(id, rpt->name);
+		return sizeof(struct gamepad_feature_rpt_slot_name);
+	}
 	if (id == GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID) {
         struct gamepad_feature_rpt_active_calib *rpt = (struct gamepad_feature_rpt_active_calib *)buf;
         rpt->report_id = id;
@@ -403,6 +451,20 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 		return 0;
 	}
 
+	if (id >= GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT1_ID && 
+		id < GAMEPAD_FEATURE_REPORT_SLOT_NAME_ID_BASE + GAMEPAD_TOTAL_CURVE_SLOT_NUM) {
+		
+		if (len < sizeof(struct gamepad_feature_rpt_slot_name)) {
+			LOG_ERR("Slot name payload too short");
+			return -EINVAL;
+		}
+		struct gamepad_feature_rpt_slot_name *rpt = (struct gamepad_feature_rpt_slot_name *)buf;
+		int err = set_slot_name(id, rpt->name);
+		if (err) {
+			LOG_ERR("set_slot_name() returns %d", err);
+		}
+		return 0;
+	}
 	if (id == GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID) {
         struct gamepad_feature_rpt_active_calib *rpt = (struct gamepad_feature_rpt_active_calib *)buf;
         int err = set_active_calib(rpt->active_calib_slot);
