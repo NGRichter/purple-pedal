@@ -2,7 +2,7 @@
 / {
 	hid_dev_0: hid_dev_0 {
 		compatible = "zephyr,hid-device";
-		label = "PurplePedal";
+		label = "PRL Pedals";
 		protocol-code = "none";
 		in-report-size = <64>;
 		in-polling-period-us = <10000>;
