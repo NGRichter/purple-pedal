@@ -137,6 +137,46 @@ LOG_MODULE_REGISTER(usb, CONFIG_APP_LOG_LEVEL);
 			HID_REPORT_SIZE(8),	\
 			HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
 			HID_FEATURE(0x02), \
+			/* curve slot 6*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CURVE_SLOT6_ID), \
+            HID_USAGE(0x24), \
+            HID_LOGICAL_MIN8(0x00),	\
+            HID_LOGICAL_MAX16(0xff, 0x00),	\
+            HID_REPORT_SIZE(8),	\
+            HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
+            HID_FEATURE(0x02), \
+            /* curve slot 7*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CURVE_SLOT7_ID), \
+            HID_USAGE(0x24), \
+            HID_LOGICAL_MIN8(0x00),	\
+            HID_LOGICAL_MAX16(0xff, 0x00),	\
+            HID_REPORT_SIZE(8),	\
+            HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
+            HID_FEATURE(0x02), \
+            /* curve slot 8*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CURVE_SLOT8_ID), \
+            HID_USAGE(0x24), \
+            HID_LOGICAL_MIN8(0x00),	\
+            HID_LOGICAL_MAX16(0xff, 0x00),	\
+            HID_REPORT_SIZE(8),	\
+            HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
+            HID_FEATURE(0x02), \
+            /* curve slot 9*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CURVE_SLOT9_ID), \
+            HID_USAGE(0x24), \
+            HID_LOGICAL_MIN8(0x00),	\
+            HID_LOGICAL_MAX16(0xff, 0x00),	\
+            HID_REPORT_SIZE(8),	\
+            HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
+            HID_FEATURE(0x02), \
+            /* curve slot 10*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CURVE_SLOT10_ID), \
+            HID_USAGE(0x24), \
+            HID_LOGICAL_MIN8(0x00),	\
+            HID_LOGICAL_MAX16(0xff, 0x00),	\
+            HID_REPORT_SIZE(8),	\
+            HID_REPORT_COUNT(sizeof(struct gamepad_feature_rpt_curve)-1), \
+            HID_FEATURE(0x02), \
 			/* Preset Name Slot 1*/ \
 			HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_SLOT_NAME_SLOT1_ID), \
 			HID_USAGE(0x25), \
@@ -225,6 +265,46 @@ LOG_MODULE_REGISTER(usb, CONFIG_APP_LOG_LEVEL);
     		HID_REPORT_SIZE(8), \
     		HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
     		HID_FEATURE(0x02), \
+    		/* Calibration slot 6*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT6_ID), \
+            HID_USAGE(0x25), \
+            HID_LOGICAL_MIN8(0x00), \
+            HID_LOGICAL_MAX16(0xff, 0x00), \
+            HID_REPORT_SIZE(8), \
+            HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+            HID_FEATURE(0x02), \
+            /* Calibration slot 7*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT7_ID), \
+            HID_USAGE(0x25), \
+            HID_LOGICAL_MIN8(0x00), \
+            HID_LOGICAL_MAX16(0xff, 0x00), \
+            HID_REPORT_SIZE(8), \
+            HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+            HID_FEATURE(0x02), \
+            /* Calibration slot 8*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT8_ID), \
+            HID_USAGE(0x25), \
+            HID_LOGICAL_MIN8(0x00), \
+            HID_LOGICAL_MAX16(0xff, 0x00), \
+            HID_REPORT_SIZE(8), \
+            HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+            HID_FEATURE(0x02), \
+            /* Calibration slot 9*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT9_ID), \
+            HID_USAGE(0x25), \
+            HID_LOGICAL_MIN8(0x00), \
+            HID_LOGICAL_MAX16(0xff, 0x00), \
+            HID_REPORT_SIZE(8), \
+            HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+            HID_FEATURE(0x02), \
+            /* Calibration slot 10*/ \
+            HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_CALIB_SLOT10_ID), \
+            HID_USAGE(0x25), \
+            HID_LOGICAL_MIN8(0x00), \
+            HID_LOGICAL_MAX16(0xff, 0x00), \
+            HID_REPORT_SIZE(8), \
+            HID_REPORT_COUNT(sizeof(struct gamepad_calibration)), \
+            HID_FEATURE(0x02), \
 			HID_END_COLLECTION,			\
 }
 //TODO: add usage page LED and LED outputs. see HUT doc section 11 LED Page.
