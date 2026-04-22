@@ -12,9 +12,15 @@ LOG_MODULE_REGISTER(nvs_settings, CONFIG_APP_LOG_LEVEL);
 #define SETTING_SUB_CURVE_ACTIVE "active"
 #define SETTING_SUB_CURVE_SLOT "slot"
 
+#define SETTING_SUB_CALIB_ACTIVE "c_active"
+#define SETTING_SUB_CALIB_SLOT "c_slot"
+
 #define SETTING_CALIBRATION SETTING_GAMEPAD_ROOT"/"SETTING_SUB_CALIBRATION
 #define SETTING_CURVE_ACTIVE SETTING_GAMEPAD_ROOT"/"SETTING_SUB_CURVE"/"SETTING_SUB_CURVE_ACTIVE
 #define SETTING_CURVE_SLOT SETTING_GAMEPAD_ROOT"/"SETTING_SUB_CURVE"/"SETTING_SUB_CURVE_SLOT
+
+#define SETTING_CALIB_ACTIVE SETTING_GAMEPAD_ROOT"/"SETTING_SUB_CALIB_ACTIVE
+#define SETTING_CALIB_SLOT SETTING_GAMEPAD_ROOT"/"SETTING_SUB_CALIB_SLOT
 
 #define SETTING_CALIBRATION_LEN (sizeof(struct gamepad_calibration))
 #define SETTING_CURVE_ACTIVE_LEN (SIZEOF_FIELD(struct gamepad_feature_rpt_active_curve, active_curve_slot))
@@ -33,9 +39,16 @@ static char gp_slot_names[GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM][MAX_SLOT_NAME_L
 // 	SETTING_CURVE_SLOT(5),
 // };
 
+// Brake has a larger range
 static struct gamepad_calibration gp_calibration = {
-    .offset = {[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_OFFSET},
-    .scale = {[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_SCALE},
+    .offset = {
+        [0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_OFFSET,
+        [1] = LOAD_CELL_INDEX_1_OFFSET
+    },
+    .scale = {
+        [0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_SCALE,
+        [1] = LOAD_CELL_INDEX_1_SCALE
+    },
 };
 
 static struct gamepad_curve_context gp_curve_ctx = {
@@ -49,15 +62,34 @@ static struct gamepad_curve_context gp_curve_ctx = {
 	}
 };
 
+static struct gamepad_calib_context gp_calib_ctx;
+
 int gampepad_setting_handle_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	int rc;
 	const char *next;
-	if (settings_name_steq(name, SETTING_SUB_CALIBRATION, &next) && !next) {
-		if (len != SETTING_CALIBRATION_LEN) {
+	if (settings_name_steq(name, SETTING_SUB_CALIB_ACTIVE, &next) && !next) {
+		if (len != sizeof(uint8_t)) {
 			return -EINVAL;
 		}
-		rc = read_cb(cb_arg, &gp_calibration, SETTING_CALIBRATION_LEN);
+		rc = read_cb(cb_arg, &gp_calib_ctx.active_calib_slot, sizeof(uint8_t));
+		if (rc >= 0) {
+			return 0;
+		}
+ 	   return rc;
+	}
+
+	if (settings_name_steq(name, SETTING_SUB_CALIB_SLOT, &next) && next) {
+		if (*next < '1' || *next > ('0' + GAMEPAD_TOTAL_CALIB_SLOT_NUM)) {
+			return -EINVAL;
+		}
+		uint8_t slot = *next - '0';
+
+		if (len != sizeof(struct gamepad_calibration)) {
+			return -EINVAL;
+		}
+
+		rc = read_cb(cb_arg, &gp_calib_ctx.calib_slot[slot - 1], sizeof(struct gamepad_calibration));
 		if (rc >= 0) {
 			return 0;
 		}
@@ -128,6 +160,19 @@ int app_setting_init(void)
 	for (size_t i = 0; i < GAMEPAD_FEATURE_REPORT_CURVE_SLOT_NUM; i++) {
         snprintf(gp_slot_names[i], MAX_SLOT_NAME_LEN, "Preset %d", i + 1);
     }
+	gp_calib_ctx.active_calib_slot = 1;
+	for (size_t slot = 0; slot < GAMEPAD_TOTAL_CALIB_SLOT_NUM; slot++) {
+		gp_calib_ctx.calib_slot[slot] = (struct gamepad_calibration) {
+			.offset = {
+				[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_OFFSET,
+				[1] = LOAD_CELL_INDEX_1_OFFSET
+			},
+			.scale = {
+				[0 ... SETTING_INDEX_TOTAL-1] = LOAD_CELL_DEFAULT_SCALE,
+				[1] = LOAD_CELL_INDEX_1_SCALE
+			}
+		};
+	}
 
 	int rc = settings_subsys_init();
 	if (rc) {
@@ -231,4 +276,57 @@ int get_slot_name(uint8_t slot_id, char *name)
     
     memcpy(name, gp_slot_names[slot - 1], MAX_SLOT_NAME_LEN);
     return 0;
+}
+int set_active_calib(uint8_t slot)
+{
+    if (slot == 0 || slot > GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        return -EINVAL;
+    }
+    
+    int err = settings_save_one(SETTING_CALIB_ACTIVE, &slot, sizeof(slot));
+    if (err) return err;
+    
+    gp_calib_ctx.active_calib_slot = slot;
+    return 0;
+}
+
+uint8_t get_active_calib(void)
+{
+    return gp_calib_ctx.active_calib_slot;
+}
+
+int set_calib_slot(uint8_t slot_id, const struct gamepad_calibration *calib)
+{
+    uint8_t slot = slot_id - GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE;
+    if (slot == 0 || slot > GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        return -EINVAL;
+    }
+
+    char setting_name[sizeof(SETTING_CALIB_SLOT) + 3]; 
+    snprintf(setting_name, sizeof(setting_name), SETTING_CALIB_SLOT"/%d", slot);
+    
+    int err = settings_save_one(setting_name, calib, sizeof(struct gamepad_calibration));
+    if (err) return err;
+
+    memcpy(&gp_calib_ctx.calib_slot[slot - 1], calib, sizeof(struct gamepad_calibration));
+    return 0;
+}
+
+int get_calib_slot(uint8_t slot_id, struct gamepad_calibration *calib)
+{
+    uint8_t slot = slot_id - GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE;
+    if (slot == 0 || slot > GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        return -EINVAL;
+    }
+    memcpy(calib, &gp_calib_ctx.calib_slot[slot - 1], sizeof(struct gamepad_calibration));
+    return 0;
+}
+
+struct gamepad_calibration* get_current_active_calib_ptr(void)
+{
+    uint8_t slot = gp_calib_ctx.active_calib_slot;
+    if (slot == 0 || slot > GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
+        slot = 1; // Fallback to slot 1 if uninitialized
+    }
+    return &gp_calib_ctx.calib_slot[slot - 1];
 }
