@@ -257,7 +257,6 @@ LOG_MODULE_REGISTER(usb, CONFIG_APP_LOG_LEVEL);
 			HID_REPORT_SIZE(8), \
 			HID_REPORT_COUNT(MAX_SLOT_NAME_LEN), \
 			HID_FEATURE(0x02), \
-	HID_END_COLLECTION,			\
 			/* Active Calibration Report */ \
     		HID_REPORT_ID(GAMEPAD_FEATURE_REPORT_ACTIVE_CALIB_ID), \
 			HID_USAGE(0x25), \
@@ -491,11 +490,11 @@ static int gamepad_get_report(const struct device *dev,const uint8_t type, const
 
     if (id >= GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE && 
         id < GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE + GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
-        
+        if (len < sizeof(struct gamepad_feature_rpt_calib_slot) - 1) return 0;
         struct gamepad_feature_rpt_calib_slot *rpt = (struct gamepad_feature_rpt_calib_slot *)buf;
         rpt->report_id = id;
         get_calib_slot(id, &rpt->calib);
-        return sizeof(struct gamepad_feature_rpt_calib_slot);
+        return sizeof(struct gamepad_feature_rpt_calib_slot) - 1;
     }
 
 	LOG_WRN("Get Report not implemented, Type %u ID %u", type, id);
@@ -597,7 +596,7 @@ static int gamepad_set_report(const struct device *dev, const uint8_t type, cons
 
     if (id >= GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE && 
         id < GAMEPAD_FEATURE_REPORT_CALIB_SLOT_ID_BASE + GAMEPAD_TOTAL_CALIB_SLOT_NUM) {
-        
+        if (len < sizeof(struct gamepad_feature_rpt_calib_slot) - 1) return 0;
         struct gamepad_feature_rpt_calib_slot *rpt = (struct gamepad_feature_rpt_calib_slot *)buf;
         int err = set_calib_slot(id, &rpt->calib);
         if (err) {
